@@ -26,10 +26,10 @@ training_features = [
 # V2_UL_Apr09_2025_DyTtStVvEwkGghVbf_allOtherParamsOn_ScaleWgt0_75
 
 training_samples = {
-        "background": [
+        "background": [ # full mc
             # "dy_M-100To200", 
             # "dy_M-100To200_MiNNLO",
-            # "dyTo2Mu_M-50_aMCatNLO",
+            "dyTo2Mu_M-50_aMCatNLO",
             "dyTo2L_M-50_incl",
             # "dy_m105_160_amc",
             # "dy_m100_200_UL",
@@ -49,10 +49,16 @@ training_samples = {
             # "wwz",
             # "wzz",
             # "zzz",
-            # "ewk_lljj_mll50_mjj120",
+            "ewk_mmjj_mll_105_160",
             # "ewk_mmjj",
             # "ewk_lljj",
         ],
+        # "background": [ # test
+        #     # "dyTo2Mu_M-50_aMCatNLO",
+        #     "dyTo2L_M-50_incl",
+        #     # "dy_m105_160_amc",
+        #     # "dy_m100_200_UL",
+        # ],
         "signal": [
             "ggh_powhegPS", 
             # "vbf_powheg_dipole", # adding vbf only makes BDT concentrate on vbf for some reason

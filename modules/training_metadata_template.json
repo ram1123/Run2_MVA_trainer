@@ -1,0 +1,62 @@
+{
+    "hyperparameter_search_fold0": {
+        "best_params": {
+            "colsample_bylevel": 0.5794989151126982,
+            "colsample_bytree": 0.9242305469168977,
+            "gamma": 2.9799614489921398,
+            "learning_rate": 0.013411976658720598,
+            "max_bin": 280,
+            "max_depth": 10,
+            "min_child_weight": 26.481251237053826,
+            "n_estimators": 381,
+            "reg_alpha": 8.17808044690262,
+            "reg_lambda": 48.89487954474727,
+            "subsample": 0.8780097801420017
+        }
+    },
+    "hyperparameter_search_fold1": {
+        "best_params": {
+            "colsample_bylevel": 0.5794989151126982,
+            "colsample_bytree": 0.9242305469168977,
+            "gamma": 2.9799614489921398,
+            "learning_rate": 0.013411976658720598,
+            "max_bin": 280,
+            "max_depth": 10,
+            "min_child_weight": 26.481251237053826,
+            "n_estimators": 381,
+            "reg_alpha": 8.17808044690262,
+            "reg_lambda": 48.89487954474727,
+            "subsample": 0.8780097801420017
+        }
+    },
+    "hyperparameter_search_fold2": {
+        "best_params": {
+            "colsample_bylevel": 0.5794989151126982,
+            "colsample_bytree": 0.9242305469168977,
+            "gamma": 2.9799614489921398,
+            "learning_rate": 0.013411976658720598,
+            "max_bin": 280,
+            "max_depth": 10,
+            "min_child_weight": 26.481251237053826,
+            "n_estimators": 381,
+            "reg_alpha": 8.17808044690262,
+            "reg_lambda": 48.89487954474727,
+            "subsample": 0.8780097801420017
+        }
+    },
+    "hyperparameter_search_fold3": {
+        "best_params": {
+            "colsample_bylevel": 0.5794989151126982,
+            "colsample_bytree": 0.9242305469168977,
+            "gamma": 2.9799614489921398,
+            "learning_rate": 0.013411976658720598,
+            "max_bin": 280,
+            "max_depth": 10,
+            "min_child_weight": 26.481251237053826,
+            "n_estimators": 381,
+            "reg_alpha": 8.17808044690262,
+            "reg_lambda": 48.89487954474727,
+            "subsample": 0.8780097801420017
+        }
+    }
+}

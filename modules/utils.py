@@ -1,10 +1,13 @@
-import pandas as pd
-import numpy as np
 import copy
-from scipy.optimize import linear_sum_assignment
-import matplotlib.pyplot as plt
 from pathlib import Path
+
 import awkward as ak
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from scipy.optimize import linear_sum_assignment
+from rich import print
+
 
 def get_subdirs(path):
     p = Path(path)
@@ -270,9 +273,9 @@ def PairNAnnhilateNegWgt(df, max_num_rows=80_000):
     print(f"df len {len(df)}")
     print(f"max_num_rows {max_num_rows}")
     datasets = df["dataset"].unique()
-    # year_param_name = "bdt_year"
     year_param_name = "year"
     years = df[year_param_name].unique()
+    
     # Make an empty copy of df (same columns, no rows)
     df_out = df.iloc[0:0].copy()
     
@@ -300,8 +303,6 @@ def PairNAnnhilateNegWgt(df, max_num_rows=80_000):
                 df_out = pd.concat([df_out, subset], ignore_index=True)
 
     print(f"final df_out len {len(df_out)}")
-    # print(df_out)
-    # raise ValueError
     df_out = df_out[df_out["wgt_nominal_orig"] >=0] # FIXME. we see two entries (so very few) that still have negative events, so temp solution. The two entries are from one of the none DY bkg events.
     return df_out
 
@@ -311,12 +312,10 @@ def PairNAnnhilateNegWgt_inChunks(df, max_num_rows=80_000):
     print(f"max_num_rows: {max_num_rows}")
     processed_chunks = []
     for chunk in split_df(df, max_num_rows):
-        processed_chunks.append(PairNAnnhilateNegWgt(df))
-        # processed_chunks.append([]) # FIXME
+        processed_chunks.append(PairNAnnhilateNegWgt(chunk, max_num_rows=max_num_rows))
     print(f"PairNAnnhilateNegWgt_inChunks processed_chunks len: {len(processed_chunks)}")
-    # raise ValueError
     return pd.concat(processed_chunks, axis=0)  # preserves chunk order
-    
+
 # def fillNanJetvariables(df, forward_filter, jet_variables):
 #     dijet_variables = [ 
 #         # 'jet1_eta', 
@@ -633,7 +632,6 @@ def customROC_curve_AN(label, pred, weight, doClassBalance = False):
     
     return (effBkg_total, effSig_total, thresholds, effBkgSig_df)
 
-# def fullROC_operations(fig, data_dict, name, year, label, doClassBalance=False):
 def fullROC_operations(fig, data_dict, save_path, year, label, doClassBalance=False):
     if doClassBalance:
         # save_str_addendum = "_clsWgtBal"
@@ -772,6 +770,7 @@ def fullROC_operations(fig, data_dict, save_path, year, label, doClassBalance=Fa
     fig.savefig(f"{save_path}/logFlip_auc_{label}_w_train{save_str_addendum}.pdf")
     
     plt.clf()
+    return auc_df
 
 
 def has_bad_values(arr):
@@ -779,7 +778,7 @@ def has_bad_values(arr):
     return not np.isfinite(arr).all()
 
 
-def reweightMassToFlat(df, sig_datasets, validation_plot_path, nbins=80, mmin=115, mmax=135, wgt_field="wgt_nominal_orig"):
+def reweightMassToFlat(df, sig_datasets, validation_plot_path, nbins=80, mmin=115, mmax=135, wgt_field="wgt_nominal"):
 
     # -----------------------------
     # 1) obtain bkg_df
@@ -842,6 +841,8 @@ def reweightMassToFlat(df, sig_datasets, validation_plot_path, nbins=80, mmin=11
         sig_df,
         bkg_df,
     ]).sort_index()
+    # overwrite the wgt_field
+    bkg_df[wgt_field] = bkg_df["wgt_flat"]
     return df
 
 
@@ -878,13 +879,13 @@ def apply_gghChannelSelection(delayed_dak_zip):
         train_region &
         ~btag_cut # btag cut is for VH and ttH categories
     )
-    print(f"category_selection sum: {ak.sum(category_selection)}")
+    # print(f"category_selection sum: {ak.sum(category_selection)}")
     computed_zip = delayed_dak_zip[category_selection].compute()
     return computed_zip
 
 
 
-def reweightMassToTargetDist_workflow(df, sig_datasets, validation_plot_path, nbins=80, mmin=115, mmax=135, wgt_field="wgt_nominal_orig", target_mass_centre = 91):
+def reweightMassToTargetDist_workflow(df, sig_datasets, validation_plot_path, nbins=80, mmin=115, mmax=135, wgt_field="wgt_nominal", target_mass_centre = 91, target_dist_load_path=None):
     """
     wrapper of reweightMassToTargetDist over sig and bkg samples
     """
@@ -896,10 +897,19 @@ def reweightMassToTargetDist_workflow(df, sig_datasets, validation_plot_path, nb
     sig_df = df[sig_filter] # you leave this alone
     bkg_df = df[~sig_filter] # work on this
 
-
-    target_dist_load_path = "stage1_output/Run3_nanoAODv12_02Feb_FilterJetsHorn30GeV/2024/compacted/dyTo2L_M-50_incl/0/part003.parquet"
-    sig_df = reweightMassToTargetDist(sig_df, target_dist_load_path, mmin, mmax, nbins, validation_plot_path, plot_name="sigMassTargetReWgt", target_mass_centre=target_mass_centre)
-    bkg_df = reweightMassToTargetDist(bkg_df, target_dist_load_path, mmin, mmax, nbins, validation_plot_path, plot_name="bkgMassTargetReWgt", target_mass_centre=target_mass_centre)
+    if target_dist_load_path is None:
+        target_dist_load_path = os.environ.get("GGH_BDT_TARGET_DIST_PATH")
+    if not target_dist_load_path:
+        raise FileNotFoundError(
+            "Mass decorrelation with a target distribution requires --target_dist_path "
+            "or the GGH_BDT_TARGET_DIST_PATH environment variable."
+        )
+    if not Path(target_dist_load_path).exists():
+        raise FileNotFoundError(
+            f"Target mass distribution parquet not found: {target_dist_load_path}"
+        )
+    sig_df = reweightMassToTargetDist(sig_df, target_dist_load_path, mmin, mmax, nbins, validation_plot_path, plot_name="sigMassTargetReWgt", wgt_field=wgt_field, target_mass_centre=target_mass_centre)
+    bkg_df = reweightMassToTargetDist(bkg_df, target_dist_load_path, mmin, mmax, nbins, validation_plot_path, plot_name="bkgMassTargetReWgt", wgt_field=wgt_field, target_mass_centre=target_mass_centre)
 
     # -----------------------------
     # 5) combine the two df back
@@ -926,17 +936,30 @@ def recenter_range(x_min, x_max, new_x_center):
     
     return new_x_min, new_x_max
 
-def reweightMassToTargetDist(df, target_dist_load_path, train_x_min, train_x_max, nbins, plot_save_path, plot_name="test", target_mass_centre = 91):
+
+def sin_histogram(nbins, xmin, xmax):
+    # bin edges
+    edges = np.linspace(xmin, xmax, nbins + 1)
+
+    # bin centers
+    centers = 0.5 * (edges[:-1] + edges[1:])
+
+    # histogram values following sin(x)
+    hist = 1.5 + np.sin(centers)
+    return hist
+
+def reweightMassToTargetDist(df, target_dist_load_path, train_x_min, train_x_max, nbins, plot_save_path, plot_name="test", wgt_field="wgt_nominal", target_mass_centre = 91):
 
     events_target = ak.from_parquet(target_dist_load_path)
     target = ak.to_numpy(events_target.dimuon_mass)
-    target_wgt = ak.to_numpy(events_target.wgt_nominal)
+    parquet_wgt_field = "wgt_nominal"
+    target_wgt = ak.to_numpy(events_target[parquet_wgt_field])
     
     # Source distribution (to be reweighted)
     # x = np.random.normal(loc=91, scale=6.4, size=50000)
     # w = np.ones_like(x)
     x = df["dimuon_mass"]
-    w = df["wgt_nominal"]
+    w = df[wgt_field]
     
     # -----------------------------
     # 2. Define binning
@@ -945,16 +968,31 @@ def reweightMassToTargetDist(df, target_dist_load_path, train_x_min, train_x_max
     # train_x_max = 135
     
     # target_mass_centre = 91
-    
-    range_ = recenter_range(train_x_min, train_x_max, target_mass_centre)
-    # print(range_)
-    
-    
-    target_hist, bin_edges = np.histogram(target, bins=nbins, range=range_, weights=target_wgt)
+    # -----------------------------
+    # Define reference disctribution
+    # as histogram 'target_hist'
+    # -----------------------------
+    if target_mass_centre == "flat": # just get a flat distribution
+        print("Taking flat distribution as the Target Hist!")
+        target_hist = np.ones(nbins)
+    elif target_mass_centre == "sinusoidal":
+        nbins = 50
+        # xmin, xmax = 0, np.pi
+        xmin, xmax = 0, 2*np.pi
+        target_hist = sin_histogram(nbins, xmin, xmax)
+
+    else: # else, it's a mass value
+        range_ = recenter_range(train_x_min, train_x_max, target_mass_centre)
+        target_hist, bin_edges = np.histogram(target, bins=nbins, range=range_, weights=target_wgt)
     
     bin_edges = np.linspace(train_x_min, train_x_max, num=(nbins+1))
     source_hist, _ = np.histogram(x, bins=bin_edges, weights=w)
+
+    print(f"sum source_hist: {np.sum(source_hist)}")
+    print(f"sum target_hist b4: {np.sum(target_hist)}")
     
+    target_hist = target_hist * (np.sum(source_hist)/np.sum(target_hist)) # match target_hist sum to source_hist sum
+    print(f"sum target_hist after: {np.sum(target_hist)}")
     # -----------------------------
     # 3. Compute scale factors
     # -----------------------------
@@ -980,8 +1018,14 @@ def reweightMassToTargetDist(df, target_dist_load_path, train_x_min, train_x_max
     # 5. Plot comparison
     # -----------------------------
     train_x_center = (train_x_max + train_x_min)/2
-    plot_range_delta = train_x_center - target_mass_centre
-    plt.hist(target+plot_range_delta, bins=bin_edges, weights=target_wgt, histtype="step", density=True, label="Target")
+    # if target_mass_centre == "flat":
+    if type(target_mass_centre) == str:
+        # plt.hist(target, bins=bin_edges, weights=target_wgt, histtype="step", density=True, label="Target")
+        print("skip plot flat distribution") # FIXME
+    else:
+        plot_range_delta = train_x_center - target_mass_centre
+        plt.hist(target+plot_range_delta, bins=bin_edges, weights=target_wgt, histtype="step", density=True, label="Target")
+        
     plt.hist(x, bins=bin_edges, weights=w, histtype="step", density=True, label="Source (before)")
     
     plt.legend()
@@ -999,6 +1043,5 @@ def reweightMassToTargetDist(df, target_dist_load_path, train_x_min, train_x_max
     # -----------------------------
     # 6. re-wgt and return df
     # -----------------------------
-    df["wgt_nominal"] =  w_new
+    df[wgt_field] =  w_new
     return df
-    
