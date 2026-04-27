@@ -885,7 +885,7 @@ def apply_gghChannelSelection(delayed_dak_zip):
 
 
 
-def reweightMassToTargetDist_workflow(df, sig_datasets, validation_plot_path, nbins=80, mmin=115, mmax=135, wgt_field="wgt_nominal", target_mass_centre = 91, target_dist_load_path=None):
+def reweightMassToTargetDist_workflow(df, sig_datasets, validation_plot_path, nbins=80, mmin=115, mmax=135, wgt_field="wgt_nominal", target_mass_centre = 91):
     """
     wrapper of reweightMassToTargetDist over sig and bkg samples
     """
@@ -897,17 +897,10 @@ def reweightMassToTargetDist_workflow(df, sig_datasets, validation_plot_path, nb
     sig_df = df[sig_filter] # you leave this alone
     bkg_df = df[~sig_filter] # work on this
 
-    if target_dist_load_path is None:
-        target_dist_load_path = os.environ.get("GGH_BDT_TARGET_DIST_PATH")
-    if not target_dist_load_path:
-        raise FileNotFoundError(
-            "Mass decorrelation with a target distribution requires --target_dist_path "
-            "or the GGH_BDT_TARGET_DIST_PATH environment variable."
-        )
-    if not Path(target_dist_load_path).exists():
-        raise FileNotFoundError(
-            f"Target mass distribution parquet not found: {target_dist_load_path}"
-        )
+
+    # target_dist_load_path = "stage1_output/Run3_nanoAODv12_02Feb_FilterJetsHorn30GeV/2024/compacted/dyTo2L_M-50_incl/0/part003.parquet"
+
+    target_dist_load_path = "/work/projects/hmm/yun79/bdt_ref_data/stage1_output/Run3_nanoAODv12_02Feb_FilterJetsHorn30GeV/2024/compacted/dyTo2L_M-50_incl/0/part003.parquet"
     sig_df = reweightMassToTargetDist(sig_df, target_dist_load_path, mmin, mmax, nbins, validation_plot_path, plot_name="sigMassTargetReWgt", wgt_field=wgt_field, target_mass_centre=target_mass_centre)
     bkg_df = reweightMassToTargetDist(bkg_df, target_dist_load_path, mmin, mmax, nbins, validation_plot_path, plot_name="bkgMassTargetReWgt", wgt_field=wgt_field, target_mass_centre=target_mass_centre)
 

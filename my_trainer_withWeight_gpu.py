@@ -35,20 +35,6 @@ from modules.utils_logger import logger
 
 plt.style.use(hep.style.CMS)
 
-
-def resolve_stage1_base(load_root, year):
-    load_root = load_root.rstrip("/")
-    if year == "2016":
-        stage1_dir = "compacted" if glob.glob(f"{load_root}/{year}*/compacted") else "f1_0"
-        return f"{load_root}/{year}*/{stage1_dir}"
-    if year == "all":
-        stage1_dir = "compacted" if glob.glob(f"{load_root}/*/compacted") else "f1_0"
-        return f"{load_root}/*/{stage1_dir}"
-
-    compacted_dir = Path(load_root) / year / "compacted"
-    stage1_dir = "compacted" if compacted_dir.exists() else "f1_0"
-    return f"{load_root}/{year}/{stage1_dir}"
-
 def get_cache_paths(save_path, year, negWgtHandling, mass_decorrelation_strat):
     cache_dir = Path(save_path) / "cached_training_df"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -176,13 +162,6 @@ if __name__ == "__main__":
         action=argparse.BooleanOptionalAction,
         help="If true, rebuild and overwrite the cached training dataframe.",
     )
-    parser.add_argument(
-        "--target_dist_path",
-        dest="target_dist_path",
-        default=None,
-        action="store",
-        help="Reference parquet used for target-shape mass decorrelation modes.",
-    )
     sysargs = parser.parse_args()
     year = sysargs.year
     name = sysargs.name
@@ -203,10 +182,11 @@ if __name__ == "__main__":
     start_time = time.time()
 
     save_path = f"output/bdt_{name}_{year}"
+    save_bdt_skim_parquet_path = f"{sysargs.load_path}/{year}"
     os.makedirs(save_path, exist_ok=True)
 
     cache_parquet_path, cache_meta_path = get_cache_paths(
-        save_path=save_path,
+        save_path=save_bdt_skim_parquet_path,
         year=year,
         negWgtHandling=negWgtHandling,
         mass_decorrelation_strat=sysargs.mass_decorrelation_strat,
@@ -216,7 +196,13 @@ if __name__ == "__main__":
     client =  Client(n_workers=10,  threads_per_worker=1, processes=True, memory_limit='25 GiB') 
 
     
-    load_path = resolve_stage1_base(sysargs.load_path, year)
+    if year == "2016":
+        load_path = f"{sysargs.load_path}/{year}*/f1_0" # copperheadV2
+    elif year == "all":
+        load_path = f"{sysargs.load_path}/*/f1_0" # copperheadV2
+    else:
+        load_path = f"{sysargs.load_path}/{year}/f1_0" # copperheadV2
+        # load_path = f"{sysargs.load_path}/{year}/compacted" # copperheadV2
     print(f"load_path: {load_path}")
     sample_l = training_samples["background"] + training_samples["signal"]
     is_UL = True
@@ -344,9 +330,7 @@ if __name__ == "__main__":
 
         elif sysargs.mass_decorrelation_strat == "targetZpeakMass":
             print("targetZpeakMass decorrlation method!")
-            df_total = reweightMassToTargetDist_workflow(
-                df_total, sig_datasets, save_path, target_dist_load_path=sysargs.target_dist_path
-            )
+            df_total = reweightMassToTargetDist_workflow(df_total, sig_datasets, save_path)
 
         elif sysargs.mass_decorrelation_strat == "targetHpeakMass":
             print("targetHpeakMass decorrlation method!")
@@ -354,8 +338,7 @@ if __name__ == "__main__":
             nbins = 20
             df_total = reweightMassToTargetDist_workflow(
                 df_total, sig_datasets, save_path,
-                nbins=nbins, target_mass_centre=dy_target_mass_centre,
-                target_dist_load_path=sysargs.target_dist_path,
+                nbins=nbins, target_mass_centre=dy_target_mass_centre
             )
 
         elif sysargs.mass_decorrelation_strat == "targetHsidebandMass":
@@ -364,8 +347,7 @@ if __name__ == "__main__":
             nbins = 40
             df_total = reweightMassToTargetDist_workflow(
                 df_total, sig_datasets, save_path,
-                nbins=nbins, target_mass_centre=dy_target_mass_centre,
-                target_dist_load_path=sysargs.target_dist_path,
+                nbins=nbins, target_mass_centre=dy_target_mass_centre
             )
 
         elif sysargs.mass_decorrelation_strat == "flatDist":
@@ -373,8 +355,7 @@ if __name__ == "__main__":
             dy_target_mass_centre = "flat"
             df_total = reweightMassToTargetDist_workflow(
                 df_total, sig_datasets, save_path,
-                target_mass_centre=dy_target_mass_centre,
-                target_dist_load_path=sysargs.target_dist_path,
+                target_mass_centre=dy_target_mass_centre
             )
 
         elif sysargs.mass_decorrelation_strat == "sinusoidalDist":
@@ -382,11 +363,9 @@ if __name__ == "__main__":
             dy_target_mass_centre = "sinusoidal"
             df_total = reweightMassToTargetDist_workflow(
                 df_total, sig_datasets, save_path,
-                target_mass_centre=dy_target_mass_centre,
-                target_dist_load_path=sysargs.target_dist_path,
+                target_mass_centre=dy_target_mass_centre
             )
 
-        training_features_prepared = prepare_features_from_df(df_total, training_features)
         save_cached_training_df(
             df_total,
             cache_parquet_path,
